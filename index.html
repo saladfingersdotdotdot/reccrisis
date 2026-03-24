@@ -170,7 +170,7 @@
             if(outs) outs.forEach(handleOutbreak);
 
             // Realtime
-            supabase.channel('room1')
+            sbClient.channel('room1')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events' }, p => handleNewEvent(p.new))
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'outbreaks' }, p => handleOutbreak(p.new))
                 .subscribe();
