@@ -73,116 +73,148 @@
         const SB_URL = 'https://ifrchxfpviwpvahpovcl.supabase.co'; 
         const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmcmNoeGZwdml3cHZhaHBvdmNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyOTAzMTEsImV4cCI6MjA4OTg2NjMxMX0.YlkPkC72mnyDGKVTlHC_wFAI4RGZZBVemykF31bor3Q';
         const sbClient = window.supabase.createClient(SB_URL, SB_KEY);
+
+    // --- 2. GLOBALS ---
+    let map;
+    let isAdmin = false;
+    let pinMode = false;
+    let pins = {};
+    let outbreaks = {};
+    
+    // --- 3. ADMIN FUNCTIONS ---
+    
+    function toggleAdmin() {
+        const pass = prompt("Enter Command Passcode:");
+        if (pass === "mun2026") {
+            isAdmin = true;
+            document.getElementById('admin-panel').classList.remove('hidden');
+            alert("Access Granted. Command mode active.");
+        } else {
+            alert("Access Denied.");
+        }
+    }
+    
+    function preparePin() {
+        if (!isAdmin) return;
+        pinMode = true;
+        const btn = document.getElementById('pin-btn');
+        btn.innerText = "READY: CLICK MAP";
+        btn.classList.replace('bg-red-600', 'bg-orange-600');
+    }
+    
+    async function submitLog() {
+        const val = document.getElementById('log-input').value;
+        if (!val) return;
+        await sbClient.from('events').insert([{ type: 'news', title: 'Update', description: val }]);
+        document.getElementById('log-input').value = '';
+    }
+    
+    async function initiateOutbreak() {
+        if (!isAdmin) return;
+        const lat = prompt("Center Latitude (e.g. 38.5):", 38.5);
+        const lng = prompt("Center Longitude (e.g. -98.0):", -98.0);
         
-        // --- GLOBALS ---
-        let map, isAdmin = false, pinMode = false;
-        let pins = {}, outbreaks = {};
-
-        // --- 1. DEFINE FUNCTIONS FIRST ---
-
-        function toggleAdmin() {
-            const pass = prompt("Enter Command Passcode:");
-            if (pass === "mun2026") {
-                isAdmin = true;
-                document.getElementById('admin-panel').classList.remove('hidden');
-                alert("Access Granted. Command mode active.");
-            } else {
-                alert("Access Denied.");
-            }
+        if (lat && lng) {
+            await sbClient.from('outbreaks').insert([{ 
+                center_lat: parseFloat(lat), 
+                center_lng: parseFloat(lng), 
+                radius_km: 100 
+            }]);
         }
-
-        function handleNewEvent(item) {
-            if (item.type === 'pin' && !pins[item.id]) {
-                const marker = L.marker([item.lat, item.lng]).addTo(map)
-                    .bindPopup(`<div class="text-slate-900"><b>${item.title}</b><br>${item.description}</div>`);
-                pins[item.id] = marker;
-            }
-            
-            const container = document.getElementById('log-container');
-            const div = document.createElement('div');
-            div.className = 'log-entry';
-            div.innerHTML = `<span class="text-blue-400 font-bold">[EVENT]</span> <span class="text-slate-200">${item.description || item.title}</span>`;
-            container.prepend(div);
+    }
+    
+    async function clearAll() {
+        if (!isAdmin) return;
+        if (!confirm("Wipe ALL map data for every viewer? This cannot be undone.")) return;
+        
+        // Deletes all rows where ID is not 0 (effectively everything)
+        await sbClient.from('events').delete().neq('id', 0);
+        await sbClient.from('outbreaks').delete().neq('id', 0);
+        
+        alert("Database cleared. The map will refresh for all users.");
+    }
+    
+    // --- 4. MAP & SYNC LOGIC ---
+    
+    function handleNewEvent(item) {
+        if (item.type === 'pin' && !pins[item.id]) {
+            const marker = L.marker([item.lat, item.lng]).addTo(map)
+                .bindPopup(`<div class="text-slate-900"><b>${item.title}</b><br>${item.description}</div>`);
+            pins[item.id] = marker;
         }
-
-        function preparePin() {
-            pinMode = true;
-            document.getElementById('pin-btn').innerText = "READY: CLICK MAP";
-            document.getElementById('pin-btn').classList.replace('bg-red-600', 'bg-orange-600');
+        
+        const container = document.getElementById('log-container');
+        const div = document.createElement('div');
+        div.className = 'log-entry border-l-4 border-blue-500 bg-blue-500/10 p-2 mb-2 text-xs font-mono';
+        div.innerHTML = `<span class="text-blue-400 font-bold">[INTEL]</span> ${item.description || item.title}`;
+        container.prepend(div);
+    }
+    
+    function handleOutbreak(item) {
+        if (outbreaks[item.id]) {
+            // Update existing radius if it changed
+            outbreaks[item.id].setRadius(item.radius_km * 1000);
+        } else {
+            // Create new circle
+            const circle = L.circle([item.center_lat, item.center_lng], {
+                color: 'red',
+                fillColor: '#f03',
+                fillOpacity: 0.4,
+                radius: item.radius_km * 1000
+            }).addTo(map);
+            outbreaks[item.id] = circle;
         }
-
-        async function submitLog() {
-            const val = document.getElementById('log-input').value;
-            if (!val) return;
-            await sbClient.from('events').insert([{ type: 'news', title: 'Update', description: val }]);
-            document.getElementById('log-input').value = '';
-        }
-
-        async function initiateOutbreak() {
-            const lat = prompt("Center Latitude:", 39.8);
-            const lng = prompt("Center Longitude:", -98.5);
-            if(lat && lng) {
-                await sbClient.from('outbreaks').insert([{ 
-                    center_lat: parseFloat(lat), center_lng: parseFloat(lng), radius_km: 100 
+    }
+    
+    function initMap() {
+        map = L.map('map').setView([37.8, -96], 4);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; CartoDB'
+        }).addTo(map);
+    
+        map.on('click', async (e) => {
+            if (!isAdmin || !pinMode) return;
+            const title = prompt("Crisis Title:");
+            const desc = prompt("Crisis Description:");
+            if (title) {
+                await sbClient.from('events').insert([{ 
+                    type: 'pin', lat: e.latlng.lat, lng: e.latlng.lng, title: title, description: desc 
                 }]);
             }
-        }
-
-        function handleOutbreak(item) {
-            if (outbreaks[item.id]) {
-                outbreaks[item.id].setRadius(item.radius_km * 1000);
-            } else {
-                outbreaks[item.id] = L.circle([item.center_lat, item.center_lng], {
-                    color: 'red', fillColor: '#f03', fillOpacity: 0.4, radius: item.radius_km * 1000
-                }).addTo(map);
-            }
-        }
-
-        // --- 2. INITIALIZATION ---
-
-        function initMap() {
-            map = L.map('map').setView([37.8, -96], 4);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; CartoDB'
-            }).addTo(map);
-
-            map.on('click', async (e) => {
-                if (!isAdmin || !pinMode) return;
-                const title = prompt("Crisis Title:");
-                const desc = prompt("Crisis Description:");
-                if (title) {
-                    await sbClient.from('events').insert([{ 
-                        type: 'pin', lat: e.latlng.lat, lng: e.latlng.lng, title: title, description: desc 
-                    }]);
-                }
-                pinMode = false;
-                document.getElementById('pin-btn').innerText = "📍 DROP CRISIS PIN";
-                document.getElementById('pin-btn').classList.replace('bg-orange-600', 'bg-red-600');
-            });
-        }
-
-        async function syncData() {
-            // Initial Fetch
-            const { data: evs } = await sbClient.from('events').select('*').order('id', { ascending: true });
-            if(evs) evs.forEach(handleNewEvent);
-
-            const { data: outs } = await sbClient.from('outbreaks').select('*');
-            if(outs) outs.forEach(handleOutbreak);
-
-            // Realtime
-            sbClient.channel('room1')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events' }, p => handleNewEvent(p.new))
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'outbreaks' }, p => handleOutbreak(p.new))
-                .subscribe();
-            
-            setTimeout(() => map.invalidateSize(), 800);
-        }
-
-        // Run
-        window.onload = () => {
-            initMap();
-            syncData();
-        };
+            pinMode = false;
+            const btn = document.getElementById('pin-btn');
+            btn.innerText = "📍 DROP CRISIS PIN";
+            btn.classList.replace('bg-orange-600', 'bg-red-600');
+        });
+    }
+    
+    async function syncData() {
+        // Initial Load
+        const { data: evs } = await sbClient.from('events').select('*').order('id', { ascending: true });
+        if (evs) evs.forEach(handleNewEvent);
+    
+        const { data: outs } = await sbClient.from('outbreaks').select('*');
+        if (outs) outs.forEach(handleOutbreak);
+    
+        // Real-time Subscriptions
+        sbClient.channel('map-sync')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events' }, p => handleNewEvent(p.new))
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'events' }, () => location.reload())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'outbreaks' }, p => {
+                if (p.eventType === 'DELETE') location.reload();
+                else handleOutbreak(p.new);
+            })
+            .subscribe();
+        
+        // Fix for Leaflet rendering issues
+        setTimeout(() => map.invalidateSize(), 500);
+    }
+    
+    // Start everything on load
+    window.onload = () => {
+        initMap();
+        syncData();
+    };
     </script>
 </body>
 </html>
