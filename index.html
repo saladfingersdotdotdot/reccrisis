@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fantasy MUN | Global Crisis Map</title>
+    <title>Crisis Command | MUN Fantasy World</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -11,212 +11,178 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
-        #map { height: 70vh; width: 100%; z-index: 1; }
-        .custom-log-entry { animation: fadeIn 0.5s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
-        /* Custom Scrollbar for Dark Mode */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #1e293b; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        body { margin: 0; padding: 0; background-color: #0f172a; color: #f1f5f9; }
+        #map { height: 70vh !important; width: 100%; border-radius: 0.75rem; background: #1e293b; z-index: 1; border: 1px solid #334155; }
+        .log-entry { border-left: 3px solid #3b82f6; padding: 8px; margin-bottom: 8px; background: rgba(59, 130, 246, 0.1); animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans overflow-x-hidden">
+<body>
 
     <nav class="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center sticky top-0 z-50">
         <div>
-            <h1 class="text-xl font-black tracking-tighter text-red-500">CRISIS ENGINE v1.0</h1>
-            <p class="text-xs text-slate-400 uppercase tracking-widest">Mock MUN Fantasy World</p>
+            <h1 class="text-xl font-bold text-red-500 tracking-tight">CRISIS ENGINE</h1>
+            <p class="text-[10px] text-slate-400 uppercase tracking-widest">Global Live Sync</p>
         </div>
-        <div class="flex items-center gap-4">
-            <div id="sync-indicator" class="flex items-center gap-2 text-xs font-mono text-green-500 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
-                <span class="relative flex h-2 w-2">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                </span>
-                LIVE_SYNC_ACTIVE
-            </div>
-            <button onclick="toggleAdmin()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded text-xs transition">Admin Access</button>
-        </div>
+        <button onclick="toggleAdmin()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded text-xs font-bold transition">ADMIN LOGIN</button>
     </nav>
 
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4">
-        
-        <div class="lg:col-span-3 space-y-4">
-            <div id="map" class="rounded-xl border border-slate-700 shadow-2xl bg-slate-800"></div>
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 p-6">
+        <div class="lg:col-span-3 space-y-6">
+            <div id="map"></div>
             
-            <div class="bg-slate-800 rounded-xl border border-slate-700 p-4 h-40 flex flex-col">
-                <h3 class="text-xs font-bold text-slate-500 uppercase mb-2">Intelligence Feed</h3>
-                <div id="log-container" class="overflow-y-auto space-y-2 flex-grow pr-2">
+            <div class="bg-slate-800 rounded-xl border border-slate-700 p-4">
+                <h3 class="text-xs font-black text-slate-500 uppercase mb-3 tracking-tighter">Live Intelligence Feed</h3>
+                <div id="log-container" class="h-40 overflow-y-auto pr-2 space-y-2 font-mono text-sm">
                     </div>
             </div>
         </div>
 
-        <aside id="sidebar" class="space-y-4">
-            <div class="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                <h3 class="font-bold text-blue-400 mb-2">Delegate Briefing</h3>
-                <p class="text-sm text-slate-400 leading-relaxed">
-                    Monitor the map for real-time crisis markers and infectious spreads. Map updates automatically.
-                </p>
+        <aside class="space-y-6">
+            <div id="admin-panel" class="hidden bg-slate-900 border-2 border-red-600/30 p-5 rounded-xl shadow-2xl space-y-4">
+                <h2 class="text-red-500 font-bold uppercase text-sm border-b border-red-900/50 pb-2">Admin Command</h2>
+                
+                <button onclick="preparePin()" id="pin-btn" class="w-full bg-red-600 hover:bg-red-700 p-3 rounded font-bold text-xs transition">
+                    📍 DROP CRISIS PIN
+                </button>
+
+                <div class="pt-4 border-t border-slate-800">
+                    <label class="text-[10px] text-slate-500 uppercase font-bold">Manual Intelligence Broadcast</label>
+                    <textarea id="log-input" class="w-full bg-slate-800 border border-slate-700 rounded p-3 text-xs mt-2 h-24 focus:ring-1 focus:ring-blue-500 outline-none" placeholder="Enter flash report..."></textarea>
+                    <button onclick="submitLog()" class="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded mt-2 text-xs font-bold transition">BROADCAST</button>
+                </div>
+
+                <div class="pt-4 border-t border-slate-800">
+                    <button onclick="initiateOutbreak()" class="w-full border border-orange-500 text-orange-500 hover:bg-orange-500/10 p-2 rounded text-xs transition">
+                        ☣️ CREATE OUTBREAK ZONE
+                    </button>
+                </div>
             </div>
 
-            <div id="admin-panel" class="hidden bg-slate-800 p-5 rounded-xl border-2 border-red-900/50 shadow-lg space-y-4">
-                <h3 class="font-bold text-red-500 flex items-center gap-2 underline decoration-red-900">
-                    COMMAND CONTROL
-                </h3>
-                
-                <div>
-                    <button onclick="preparePin()" id="pin-btn" class="w-full bg-red-600 hover:bg-red-700 p-2 rounded font-bold text-sm transition">
-                        📍 DROP CRISIS PIN
-                    </button>
-                    <p class="text-[10px] text-slate-500 mt-1 text-center italic">Click map after pressing</p>
-                </div>
-
-                <hr class="border-slate-700">
-
-                <div class="space-y-3">
-                    <label class="text-xs font-bold text-slate-400 uppercase">Outbreak Management</label>
-                    <button onclick="startOutbreak()" class="w-full border border-orange-500 text-orange-500 hover:bg-orange-500/10 p-2 rounded text-sm transition">
-                        ☣️ INITIATE OUTBREAK
-                    </button>
-                    <div id="outbreak-controls" class="hidden space-y-2 p-2 bg-slate-900 rounded">
-                        <div class="flex justify-between text-[10px] text-slate-500 uppercase">
-                            <span>Spread Radius</span>
-                            <span id="radius-val">0km</span>
-                        </div>
-                        <input type="range" id="radius-slider" min="50" max="2000" step="50" value="100" class="w-full accent-orange-500" oninput="updateOutbreakSize(this.value)">
-                    </div>
-                </div>
-
-                <hr class="border-slate-700">
-
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase">Broadcast Message</label>
-                    <textarea id="log-input" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm mt-1 h-20 focus:border-blue-500 outline-none" placeholder="Enter flash news..."></textarea>
-                    <button onclick="submitLog()" class="w-full bg-blue-600 hover:bg-blue-700 p-2 rounded mt-2 text-sm transition">PUSH TO FEED</button>
-                </div>
+            <div class="bg-slate-800/50 p-5 rounded-xl border border-slate-700">
+                <h3 class="text-blue-400 font-bold text-sm mb-2">Instructions</h3>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    Crisis markers and outbreak zones sync automatically across all screens. Admins can click the map to place markers after enabling "Drop Pin".
+                </p>
             </div>
         </aside>
     </div>
 
     <script>
-        // --- 1. SUPABASE CONFIG ---
-        const SB_URL = 'https://ifrchxfpviwpvahpovcl.supabase.co';
+        // --- CONFIGURATION ---
+        const SB_URL = 'https://ifrchxfpviwpvahpovcl.supabase.co'; 
         const SB_KEY = 'sb_publishable_eevxAU9CeuPnTONG8Ac_ww_CJ6b3s-P';
+        const supabase = window.supabase.createClient(SB_URL, SB_KEY);
 
-        // --- 2. MAP SETUP ---
-        const map = L.map('map').setView([39.82, -98.57], 4);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; CartoDB'
-        }).addTo(map);
+        // --- GLOBALS ---
+        let map, isAdmin = false, pinMode = false;
+        let pins = {}, outbreaks = {};
 
-        let pins = {};
-        let outbreaks = {};
-        let isAdmin = false;
-        let pinMode = false;
+        // --- 1. DEFINE FUNCTIONS FIRST ---
 
-        // --- 3. DATA SYNC LOGIC ---
-        async function init() {
-            // Load Events
-            const { data: eventData } = await supabase.from('events').select('*').order('id', { ascending: true });
-            eventData.forEach(handleNewEvent);
-
-            // Load Outbreaks
-            const { data: outbreakData } = await supabase.from('outbreaks').select('*');
-            outbreakData.forEach(handleOutbreakChange);
-
-            // Realtime Listeners
-            supabase.channel('global-changes')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events' }, p => handleNewEvent(p.new))
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'outbreaks' }, p => handleOutbreakChange(p.new || p.old))
-                .subscribe();
+        function toggleAdmin() {
+            const pass = prompt("Enter Command Passcode:");
+            if (pass === "mun2026") {
+                isAdmin = true;
+                document.getElementById('admin-panel').classList.remove('hidden');
+                alert("Access Granted. Command mode active.");
+            } else {
+                alert("Access Denied.");
+            }
         }
 
         function handleNewEvent(item) {
-            if (item.type === 'pin') {
+            if (item.type === 'pin' && !pins[item.id]) {
                 const marker = L.marker([item.lat, item.lng]).addTo(map)
-                    .bindPopup(`<b class="text-slate-900">${item.title}</b><br><span class="text-slate-700">${item.description}</span>`);
+                    .bindPopup(`<div class="text-slate-900"><b>${item.title}</b><br>${item.description}</div>`);
                 pins[item.id] = marker;
             }
             
-            // Log UI
             const container = document.getElementById('log-container');
-            const el = document.createElement('div');
-            el.className = 'custom-log-entry flex gap-2 text-sm border-l-2 border-blue-500 bg-blue-500/5 p-2';
-            el.innerHTML = `<span class="text-blue-400 font-mono font-bold">[${item.type.toUpperCase()}]</span> <span class="text-slate-300">${item.description || item.title}</span>`;
-            container.prepend(el);
-        }
-
-        function handleOutbreakChange(item) {
-            if (outbreaks[item.id]) {
-                outbreaks[item.id].setRadius(item.radius_km * 1000);
-            } else {
-                outbreaks[item.id] = L.circle([item.center_lat, item.center_lng], {
-                    color: item.color || 'red',
-                    fillColor: item.color || '#f03',
-                    fillOpacity: 0.4,
-                    radius: item.radius_km * 1000
-                }).addTo(map);
-            }
-        }
-
-        // --- 4. ADMIN ACTIONS ---
-        function toggleAdmin() {
-            const pass = prompt("Enter Admin Passcode:");
-            if (pass === "mun2024") { // Change this to your preferred simple code
-                isAdmin = true;
-                document.getElementById('admin-panel').classList.remove('hidden');
-                alert("Admin Access Granted");
-            }
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            div.innerHTML = `<span class="text-blue-400 font-bold">[EVENT]</span> <span class="text-slate-200">${item.description || item.title}</span>`;
+            container.prepend(div);
         }
 
         function preparePin() {
             pinMode = true;
-            document.getElementById('pin-btn').innerText = "CANCEL (Click Map)";
-            document.getElementById('pin-btn').classList.replace('bg-red-600', 'bg-slate-600');
+            document.getElementById('pin-btn').innerText = "READY: CLICK MAP";
+            document.getElementById('pin-btn').classList.replace('bg-red-600', 'bg-orange-600');
         }
 
-        map.on('click', async (e) => {
-            if (!isAdmin || !pinMode) return;
-            const title = prompt("Event Title:");
-            const desc = prompt("Event Description:");
-            if (title) {
-                await supabase.from('events').insert([{ 
-                    type: 'pin', lat: e.latlng.lat, lng: e.latlng.lng, title: title, description: desc 
-                }]);
-            }
-            pinMode = false;
-            document.getElementById('pin-btn').innerText = "📍 DROP CRISIS PIN";
-            document.getElementById('pin-btn').classList.replace('bg-slate-600', 'bg-red-600');
-        });
-
         async function submitLog() {
-            const msg = document.getElementById('log-input').value;
-            if (!msg) return;
-            await supabase.from('events').insert([{ type: 'news', title: 'Intelligence Update', description: msg }]);
+            const val = document.getElementById('log-input').value;
+            if (!val) return;
+            await supabase.from('events').insert([{ type: 'news', title: 'Update', description: val }]);
             document.getElementById('log-input').value = '';
         }
 
-        async function startOutbreak() {
-            const lat = prompt("Enter Latitude (or just click map for center):", 39.8);
-            const lng = prompt("Enter Longitude:", -98.5);
-            const { data } = await supabase.from('outbreaks').insert([{ 
-                center_lat: lat, center_lng: lng, radius_km: 100, is_active: true 
-            }]).select();
+        async function initiateOutbreak() {
+            const lat = prompt("Center Latitude:", 39.8);
+            const lng = prompt("Center Longitude:", -98.5);
+            if(lat && lng) {
+                await supabase.from('outbreaks').insert([{ 
+                    center_lat: parseFloat(lat), center_lng: parseFloat(lng), radius_km: 100 
+                }]);
+            }
+        }
+
+        function handleOutbreak(item) {
+            if (outbreaks[item.id]) {
+                outbreaks[item.id].setRadius(item.radius_km * 1000);
+            } else {
+                outbreaks[item.id] = L.circle([item.center_lat, item.center_lng], {
+                    color: 'red', fillColor: '#f03', fillOpacity: 0.4, radius: item.radius_km * 1000
+                }).addTo(map);
+            }
+        }
+
+        // --- 2. INITIALIZATION ---
+
+        function initMap() {
+            map = L.map('map').setView([37.8, -96], 4);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; CartoDB'
+            }).addTo(map);
+
+            map.on('click', async (e) => {
+                if (!isAdmin || !pinMode) return;
+                const title = prompt("Crisis Title:");
+                const desc = prompt("Crisis Description:");
+                if (title) {
+                    await supabase.from('events').insert([{ 
+                        type: 'pin', lat: e.latlng.lat, lng: e.latlng.lng, title: title, description: desc 
+                    }]);
+                }
+                pinMode = false;
+                document.getElementById('pin-btn').innerText = "📍 DROP CRISIS PIN";
+                document.getElementById('pin-btn').classList.replace('bg-orange-600', 'bg-red-600');
+            });
+        }
+
+        async function syncData() {
+            // Initial Fetch
+            const { data: evs } = await supabase.from('events').select('*').order('id', { ascending: true });
+            if(evs) evs.forEach(handleNewEvent);
+
+            const { data: outs } = await supabase.from('outbreaks').select('*');
+            if(outs) outs.forEach(handleOutbreak);
+
+            // Realtime
+            supabase.channel('room1')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'events' }, p => handleNewEvent(p.new))
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'outbreaks' }, p => handleOutbreak(p.new))
+                .subscribe();
             
-            if(data) {
-                document.getElementById('outbreak-controls').classList.remove('hidden');
-                window.currentOutbreakId = data[0].id;
-            }
+            setTimeout(() => map.invalidateSize(), 800);
         }
 
-        async function updateOutbreakSize(val) {
-            document.getElementById('radius-val').innerText = val + "km";
-            if(window.currentOutbreakId) {
-                await supabase.from('outbreaks').update({ radius_km: val }).eq('id', window.currentOutbreakId);
-            }
-        }
-
-        init();
+        // Run
+        window.onload = () => {
+            initMap();
+            syncData();
+        };
     </script>
 </body>
 </html>
